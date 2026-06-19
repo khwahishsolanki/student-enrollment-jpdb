@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Student Enrollment | JsonPowerDB</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="http://api.login2explore.com:5577/resources/js/0.0.1/jpdb-commons.js"></script>
+  <style>
+    body { background: #f0f2f5; padding: 30px; }
+    .form-box { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #2f4d3a; margin-bottom: 5px; }
+    .subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+    #statusMsg { margin-top: 10px; font-size: 13px; }
+    .ok  { color: #2f4d3a; }
+    .err { color: #c0392b; }
+    .table-section { max-width: 900px; margin: 30px auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+
+<div class="form-box">
+  <h2>Student Enrollment Form</h2>
+  <p class="subtitle">JsonPowerDB Micro Project &mdash; SCHOOL_DB &rarr; STUDENT_TABLE</p>
+
+  <div class="form-group">
+    <label>Roll No</label>
+    <input type="text" id="stuId" class="form-control" placeholder="Enter Roll No" />
+  </div>
+  <div class="form-group">
+    <label>Full Name</label>
+    <input type="text" id="stuName" class="form-control" placeholder="Full Name" disabled />
+  </div>
+  <div class="form-group">
+    <label>Class</label>
+    <input type="text" id="stuClass" class="form-control" placeholder="e.g. B.Tech CSE 2nd Year" disabled />
+  </div>
+  <div class="form-group">
+    <label>Birth Date</label>
+    <input type="date" id="stuDOB" class="form-control" disabled />
+  </div>
+  <div class="form-group">
+    <label>Address</label>
+    <input type="text" id="stuAddress" class="form-control" placeholder="e.g. Indore, MP" disabled />
+  </div>
+  <div class="form-group">
+    <label>Enrollment Date</label>
+    <input type="date" id="stuEnrollDate" class="form-control" disabled />
+  </div>
+
+  <button id="btnSave"   class="btn btn-success" disabled>Save</button>
+  <button id="btnUpdate" class="btn btn-warning" disabled>Update</button>
+  <button id="btnReset"  class="btn btn-default" disabled>Reset</button>
+
+  <p id="statusMsg"></p>
+</div>
+
+<div class="table-section">
+  <h3 style="color:#2f4d3a;">Enrolled Students</h3>
+  <table class="table table-bordered table-hover" id="studentsTable">
+    <thead style="background:#2f4d3a;color:#fff;">
+      <tr><th>Roll No</th><th>Full Name</th><th>Class</th><th>Birth Date</th><th>Address</th><th>Enroll Date</th></tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="6" class="text-center text-muted">No data yet.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+var BASE  = "http://api.login2explore.com:5577";
+var TOKEN = "90935167|-31949241355361097|90958623";
+var DB    = "SCHOOL_DB";
+var REL   = "STUDENT_TABLE";
+var recNo = null;
+
+function status(msg, type) {
+  $("#statusMsg").text(msg).removeClass("ok err").addClass(type || "ok");
+}
+
+function resetForm() {
+  $("#stuId").val("").prop("disabled", false);
+  $("#stuName, #stuClass, #stuDOB, #stuAddress, #stuEnrollDate").val("").prop("disabled", true);
+  $("#btnSave, #btnUpdate, #btnReset").prop("disabled", true);
+  recNo = null;
+  status("");
+  $("#stuId").focus();
+}
+
+function fillForm(r) {
+  $("#stuName").val(r["Full-Name"] || "");
+  $("#stuClass").val(r["Class"] || "");
+  $("#stuDOB").val(r["Birth-Date"] || "");
+  $("#stuAddress").val(r["Address"] || "");
+  $("#stuEnrollDate").val(r["Enrollment-Date"] || "");
+}
+
+function validate() {
+  var fields = {
+    "Roll No": $("#stuId").val().trim(),
+    "Full Name": $("#stuName").val().trim(),
+    "Class": $("#stuClass").val().trim(),
+    "Birth Date": $("#stuDOB").val(),
+    "Address": $("#stuAddress").val().trim(),
+    "Enrollment Date": $("#stuEnrollDate").val()
+  };
+  for (var k in fields) {
+    if (!fields[k]) { status(k + " cannot be empty.", "err"); return false; }
+  }
+  return true;
+}
+
+function getFormData() {
+  return {
+    "Roll-No": $("#stuId").val().trim(),
+    "Full-Name": $("#stuName").val().trim(),
+    "Class": $("#stuClass").val().trim(),
+    "Birth-Date": $("#stuDOB").val(),
+    "Address": $("#stuAddress").val().trim(),
+    "Enrollment-Date": $("#stuEnrollDate").val()
+  };
+}
+
+// Lookup Roll No
+$("#stuId").on("change", function() {
+  var id = $(this).val().trim();
+  if (!id) return;
+
+  var req = createCommandObject("GET_BY_KEY", TOKEN, DB, REL, JSON.stringify({"Roll-No": id}));
+  $.ajax({
+    url: BASE + "/api/irl",
+    type: "POST",
+    data: req,
+    contentType: "application/json",
+    dataType: "json",
+    success: function(res) {
+      if (res.status === 200) {
+        recNo = res.data.rec_no;
+        fillForm(res.data.record);
+        $("#stuName, #stuClass, #stuDOB, #stuAddress, #stuEnrollDate").prop("disabled", false);
+        $("#stuId").prop("disabled", true);
+        $("#btnSave").prop("disabled", true);
+        $("#btnUpdate, #btnReset").prop("disabled", false);
+        status("Student found. Edit and click Update.", "ok");
+        $("#stuName").focus();
+      } else {
+        recNo = null;
+        $("#stuName, #stuClass, #stuDOB, #stuAddress, #stuEnrollDate").prop("disabled", false);
+        $("#btnSave, #btnReset").prop("disabled", false);
+        $("#btnUpdate").prop("disabled", true);
+        status("New Roll No. Fill details and Save.", "ok");
+        $("#stuName").focus();
+      }
+    },
+    error: function() {
+      recNo = null;
+      $("#stuName, #stuClass, #stuDOB, #stuAddress, #stuEnrollDate").prop("disabled", false);
+      $("#btnSave, #btnReset").prop("disabled", false);
+      $("#btnUpdate").prop("disabled", true);
+      status("New Roll No. Fill details and Save.", "ok");
+      $("#stuName").focus();
+    }
+  });
+});
+
+// Save
+$("#btnSave").on("click", function() {
+  if (!validate()) return;
+  var req = createCommandObject("PUT", TOKEN, DB, REL, JSON.stringify(getFormData()));
+  $.ajax({
+    url: BASE + "/api/iml", type: "POST", data: req,
+    contentType: "application/json", dataType: "json",
+    success: function(res) {
+      if (res.status === 200) { status("Saved successfully!", "ok"); resetForm(); loadAll(); }
+      else status("Error: " + (res.message || "unknown"), "err");
+    },
+    error: function(e) { status("Network error: " + e.statusText, "err"); }
+  });
+});
+
+// Update
+$("#btnUpdate").on("click", function() {
+  if (!validate()) return;
+  var data = getFormData(); delete data["Roll-No"];
+  var req = createCommandObject("UPDATE", TOKEN, DB, REL, JSON.stringify({[recNo]: data}));
+  $.ajax({
+    url: BASE + "/api/iml", type: "POST", data: req,
+    contentType: "application/json", dataType: "json",
+    success: function(res) {
+      if (res.status === 200) { status("Updated successfully!", "ok"); resetForm(); loadAll(); }
+      else status("Error: " + (res.message || "unknown"), "err");
+    },
+    error: function(e) { status("Network error: " + e.statusText, "err"); }
+  });
+});
+
+// Reset
+$("#btnReset").on("click", resetForm);
+
+// Load all students
+function loadAll() {
+  var req = createCommandObject("GET_ALL", TOKEN, DB, REL, "{}");
+  $.ajax({
+    url: BASE + "/api/irl", type: "POST", data: req,
+    contentType: "application/json", dataType: "json",
+    success: function(res) {
+      if (res.status === 200 && res.data && res.data.json_records) {
+        $("#tableBody").empty();
+        $.each(res.data.json_records, function(i, item) {
+          var r = item.record;
+          var row = $("<tr>").html(
+            "<td>"+e(r["Roll-No"])+"</td><td>"+e(r["Full-Name"])+"</td><td>"+e(r["Class"])+"</td><td>"+e(r["Birth-Date"])+"</td><td>"+e(r["Address"])+"</td><td>"+e(r["Enrollment-Date"])+"</td>"
+          );
+          row.css("cursor","pointer").on("click", function(){
+            $("#stuId").val(r["Roll-No"]).prop("disabled",false).trigger("change");
+          });
+          $("#tableBody").append(row);
+        });
+      }
+    }
+  });
+}
+
+function e(s){ return $("<div>").text(s||"").html(); }
+
+resetForm();
+loadAll();
+</script>
+</body>
+</html>
